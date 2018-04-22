@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
@@ -63,8 +64,14 @@ public class UpnpDiscoverer extends Discoverer {
 
     @Override
     public List<Device> discoverDevices() throws IOException, InterruptedException, ExecutionException {
+        String ip;
+        try (final DatagramSocket socket = new DatagramSocket()) {
+            socket.connect(InetAddress.getByName("192.0.2.0"), 9688);
+            ip = socket.getLocalAddress().getHostAddress();
+        }
+
         socket = new DatagramSocket(null);
-        InetSocketAddress address = new InetSocketAddress("192.168.1.124", 1900); // TODO: get IP automagically
+        InetSocketAddress address = new InetSocketAddress(ip, 1900);
         socket.bind(address);
 
         byte[] request = new String("M-SEARCH * HTTP/1.1\n" +
