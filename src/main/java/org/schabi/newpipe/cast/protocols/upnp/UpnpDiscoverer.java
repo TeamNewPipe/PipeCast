@@ -4,10 +4,15 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -33,7 +38,7 @@ public class UpnpDiscoverer extends Discoverer {
     private class ReceiveDevices implements Callable<Object> {
         @Override
         public Object call() throws IOException {
-            devices = new ArrayList<Device>();
+            //devices = new ArrayList<Device>();
             while (true) {
                 byte[] buffer = new byte[1024];
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
@@ -63,29 +68,47 @@ public class UpnpDiscoverer extends Discoverer {
 
     @Override
     public List<Device> discoverDevices() throws IOException, InterruptedException, ExecutionException {
-        socket = new DatagramSocket(null);
-        InetSocketAddress address = new InetSocketAddress("192.168.1.124", 1900); // TODO: get IP automagically
-        socket.bind(address);
-
-        byte[] request = new String("M-SEARCH * HTTP/1.1\n" +
-                                    "HOST: 239.255.255.250:1900\n" +
-                                    "MAN: \"ssdp:discover\"\n" +
-                                    "MX: 5\n" +
-                                    "ST: urn:schemas-upnp-org:device:MediaRenderer:1\n" +
-                                    "CFPN.UPNP.ORG: PipeCast\n\n").getBytes();
-        DatagramPacket requestDatagram = new DatagramPacket(request, request.length, Inet4Address.getByName("239.255.255.250"), 1900);
-        socket.send(requestDatagram);
-
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<Object> future = executor.submit(new ReceiveDevices());
-        try {
-            future.get(5, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            future.cancel(true);
+        Set<String> addresses = new HashSet<>();
+        // get all site-local IPs to scan from
+        Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
+        while (ifaces.hasMoreElements()) {
+            NetworkInterface ni = ifaces.nextElement();
+            Enumeration<InetAddress> addrs = ni.getInetAddresses();
+            while (addrs.hasMoreElements()) {
+                InetAddress current = addrs.nextElement();
+                if (current.isSiteLocalAddress()) {
+                    addresses.add(current.getHostAddress());
+                }
+            }
         }
-        executor.shutdownNow();
 
-        socket.close();
+        devices = new ArrayList<>();
+
+        for (String addr : addresses) {
+            socket = new DatagramSocket(null);
+            InetSocketAddress address = new InetSocketAddress(addr, 0);
+            socket.bind(address);
+
+            byte[] request = new String("M-SEARCH * HTTP/1.1\n" +
+                    "HOST: 239.255.255.250:1900\n" +
+                    "MAN: \"ssdp:discover\"\n" +
+                    "MX: 5\n" +
+                    "ST: urn:schemas-upnp-org:device:MediaRenderer:1\n" +
+                    "CFPN.UPNP.ORG: PipeCast\n\n").getBytes();
+            DatagramPacket requestDatagram = new DatagramPacket(request, request.length, Inet4Address.getByName("239.255.255.250"), 1900);
+            socket.send(requestDatagram);
+
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            Future<Object> future = executor.submit(new ReceiveDevices());
+            try {
+                future.get(5, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                future.cancel(true);
+            }
+            executor.shutdownNow();
+
+            socket.close();
+        }
 
         return devices;
     }
