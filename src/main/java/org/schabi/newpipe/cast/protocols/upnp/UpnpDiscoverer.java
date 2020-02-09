@@ -19,6 +19,9 @@ import java.util.concurrent.TimeoutException;
 
 import org.schabi.newpipe.cast.Device;
 import org.schabi.newpipe.cast.Discoverer;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.ParserConfigurationException;
 
 public class UpnpDiscoverer extends Discoverer {
     private static final UpnpDiscoverer instance = new UpnpDiscoverer();
@@ -33,7 +36,7 @@ public class UpnpDiscoverer extends Discoverer {
 
     private class ReceiveDevices implements Callable<Object> {
         @Override
-        public Object call() throws IOException {
+        public Object call() throws IOException, ParserConfigurationException, SAXException {
             devices = new ArrayList<Device>();
             while (true) {
                 byte[] buffer = new byte[1024];
@@ -74,12 +77,12 @@ public class UpnpDiscoverer extends Discoverer {
         InetSocketAddress address = new InetSocketAddress(ip, 1900);
         socket.bind(address);
 
-        byte[] request = new String("M-SEARCH * HTTP/1.1\n" +
-                                    "HOST: 239.255.255.250:1900\n" +
-                                    "MAN: \"ssdp:discover\"\n" +
-                                    "MX: 5\n" +
-                                    "ST: urn:schemas-upnp-org:device:MediaRenderer:1\n" +
-                                    "CFPN.UPNP.ORG: PipeCast\n\n").getBytes();
+        byte[] request = ("M-SEARCH * HTTP/1.1\n" +
+                          "HOST: 239.255.255.250:1900\n" +
+                          "MAN: \"ssdp:discover\"\n" +
+                          "MX: 5\n" +
+                          "ST: urn:schemas-upnp-org:device:MediaRenderer:1\n" +
+                          "CFPN.UPNP.ORG: PipeCast\n\n").getBytes();
         DatagramPacket requestDatagram = new DatagramPacket(request, request.length, Inet4Address.getByName("239.255.255.250"), 1900);
         socket.send(requestDatagram);
 
