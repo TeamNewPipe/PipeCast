@@ -1,12 +1,12 @@
 # PipeCast
 
-PipeCast is a library for 'casting' a stream to a device, like a Chromecast. Currently it only supports discovery. It'll be used by NewPipe.
+PipeCast is a library for 'casting' a stream to a device, like a Chromecast. It's going to be used by NewPipe
 
 ## Supported protocols
 
 The following protocols are currently supported by PipeCast:
 
-- UPnP
+- UPnP A/V
 
 ## License
 

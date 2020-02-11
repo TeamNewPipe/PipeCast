@@ -23,6 +23,9 @@ import java.util.concurrent.TimeoutException;
 
 import org.schabi.newpipe.cast.Device;
 import org.schabi.newpipe.cast.Discoverer;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.ParserConfigurationException;
 
 public class UpnpDiscoverer extends Discoverer {
     private static final UpnpDiscoverer instance = new UpnpDiscoverer();
@@ -37,8 +40,8 @@ public class UpnpDiscoverer extends Discoverer {
 
     private class ReceiveDevices implements Callable<Object> {
         @Override
-        public Object call() throws IOException {
-            //devices = new ArrayList<Device>();
+        public Object call() throws IOException, ParserConfigurationException, SAXException {
+            devices = new ArrayList<Device>();
             while (true) {
                 byte[] buffer = new byte[1024];
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
