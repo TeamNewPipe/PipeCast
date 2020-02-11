@@ -7,7 +7,10 @@ import java.io.OutputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.net.HttpURLConnection;
+import java.net.ProtocolException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -17,7 +20,7 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
 import org.schabi.newpipe.cast.Device;
-import org.schabi.newpipe.cast.ItemClass;
+import org.schabi.newpipe.cast.MediaFormat;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -27,7 +30,8 @@ import org.xml.sax.SAXException;
 public class UpnpDevice extends Device {
     private Document description;
     private Element device;
-    private URL controlUrl;
+    private URL avTransportUrl;
+    private URL connectionManagerUrl;
 
     public UpnpDevice(String location) throws IOException, ParserConfigurationException, SAXException {
         super(location);
@@ -62,7 +66,10 @@ public class UpnpDevice extends Device {
             Element service = (Element) services.item(i);
             if (service.getElementsByTagName("serviceType").item(0).getTextContent().equals("urn:schemas-upnp-org:service:AVTransport:1")) {
                 String serviceUrl = service.getElementsByTagName("controlURL").item(0).getTextContent();
-                controlUrl = new URL(baseUrl, serviceUrl);
+                avTransportUrl = new URL(baseUrl, serviceUrl);
+            } else if (service.getElementsByTagName("serviceType").item(0).getTextContent().equals("urn:schemas-upnp-org:service:ConnectionManager:1")) {
+                String serviceUrl = service.getElementsByTagName("controlURL").item(0).getTextContent();
+                connectionManagerUrl = new URL(baseUrl, serviceUrl);
             }
         }
     }
@@ -73,7 +80,7 @@ public class UpnpDevice extends Device {
     }
 
     private void play() throws IOException, XMLStreamException {
-        HttpURLConnection connection = (HttpURLConnection) controlUrl.openConnection();
+        HttpURLConnection connection = (HttpURLConnection) avTransportUrl.openConnection();
         connection.setDoOutput(true);
         connection.setRequestMethod("POST");
         connection.setRequestProperty("Content-Type", "text/xml;charset=utf-8");
@@ -110,8 +117,8 @@ public class UpnpDevice extends Device {
     }
 
     @Override
-    public void play(String url, String title, String creator, String mimeType, ItemClass itemClass) throws IOException, XMLStreamException {
-        HttpURLConnection connection = (HttpURLConnection) controlUrl.openConnection();
+    public void play(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XMLStreamException {
+        HttpURLConnection connection = (HttpURLConnection) avTransportUrl.openConnection();
         connection.setDoOutput(true);
         connection.setRequestMethod("POST");
         connection.setRequestProperty("Content-Type", "text/xml;charset=utf-8");
@@ -134,7 +141,7 @@ public class UpnpDevice extends Device {
         didlWriter.writeAttribute("parentID", "/test");
         didlWriter.writeAttribute("restricted", "1");
         didlWriter.writeStartElement("upnp:class");
-        didlWriter.writeCharacters(itemClass.upnpClass);
+        didlWriter.writeCharacters(mediaFormat.upnpClass);
         didlWriter.writeEndElement();
         didlWriter.writeStartElement("dc:title");
         didlWriter.writeCharacters(title);
@@ -143,7 +150,15 @@ public class UpnpDevice extends Device {
         didlWriter.writeCharacters(creator);
         didlWriter.writeEndElement();
         didlWriter.writeStartElement("res");
-        didlWriter.writeAttribute("protocolInfo", "http-get:*:" + mimeType + ":*"); // TODO: add DLNA-specific stuff
+
+        String protocolInfo = "http-get:*:" + mediaFormat.mimeType + ":";
+        if (mediaFormat.dlnaProfile == null) {
+            protocolInfo += "*";
+        } else {
+            protocolInfo += "DLNA.ORG_PN=" + mediaFormat.dlnaProfile;
+        }
+
+        didlWriter.writeAttribute("protocolInfo", protocolInfo); // TODO: add more DLNA-specific stuff
         didlWriter.writeCharacters(url);
         didlWriter.writeEndElement();
         didlWriter.writeEndElement();
@@ -182,5 +197,71 @@ public class UpnpDevice extends Device {
         connection.getInputStream();
 
         play();
+    }
+
+    @Override
+    public List<MediaFormat> getSupportedFormats() throws IOException, XMLStreamException, ParserConfigurationException, SAXException {
+        HttpURLConnection connection = (HttpURLConnection) connectionManagerUrl.openConnection();
+        connection.setDoOutput(true);
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "text/xml;charset=utf-8");
+        connection.setRequestProperty("Soapaction", "\"urn:schemas-upnp-org:service:ConnectionManager:1#GetProtocolInfo\"");
+        connection.setDoOutput(true);
+        OutputStream outputStream = connection.getOutputStream();
+
+        StringWriter sw = new StringWriter();
+        XMLOutputFactory xmlof = XMLOutputFactory.newInstance();
+        XMLStreamWriter writer = xmlof.createXMLStreamWriter(sw);
+        writer.writeStartDocument("utf-8", "1.0");
+        writer.writeStartElement("s:Envelope");
+        writer.writeAttribute("s:encodingStyle", "http://schemas.xmlsoap.org/soap/encoding/");
+        writer.writeNamespace("s", "http://schemas.xmlsoap.org/soap/envelope/");
+        writer.writeStartElement("s:Body");
+        writer.writeStartElement("u:GetProtocolInfo");
+        writer.writeNamespace("u", "urn:schemas-upnp-org:service:ConnectionManager:1");
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndDocument();
+        writer.close();
+
+        byte[] xml = sw.toString().getBytes();
+        outputStream.write(xml);
+        outputStream.close();
+
+        BufferedReader input = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+        String line;
+        StringBuilder response = new StringBuilder();
+        while ((line = input.readLine()) != null) {
+            response.append(line);
+        }
+        input.close();
+
+        System.out.println(response.toString());
+
+        InputSource inputSource = new InputSource(new StringReader(response.toString()));
+        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
+        Document document = documentBuilder.parse(inputSource);
+        document.getDocumentElement().normalize();
+        Element body = (Element) document.getDocumentElement().getElementsByTagName("s:Body").item(0);
+        Element getProtocolInfoResponse = (Element) body.getElementsByTagName("u:GetProtocolInfoResponse").item(0);
+        String sinkText = getProtocolInfoResponse.getElementsByTagName("Sink").item(0).getTextContent();
+
+        List<MediaFormat> supportedFormats = new ArrayList<MediaFormat>();
+
+        String[] sinks = sinkText.split(",");
+        for (String sink : sinks) {
+            String[] splittedSink = sink.split(":");
+            if (splittedSink[0].equals("http-get"))  {
+                for (MediaFormat mediaFormat : MediaFormat.values()) {
+                    if (splittedSink[2].equals(mediaFormat.mimeType)) {
+                        supportedFormats.add(mediaFormat);
+                    }
+                }
+            }
+        }
+
+        return supportedFormats;
     }
 }
