@@ -57,7 +57,13 @@ public class UpnpDevice extends Device {
         description.getDocumentElement().normalize();
         device = (Element) description.getDocumentElement().getElementsByTagName("device").item(0);
 
-        URL baseUrl = new URL(description.getDocumentElement().getElementsByTagName("URLBase").item(0).getTextContent());
+        Element urlBase = (Element) description.getDocumentElement().getElementsByTagName("URLBase").item(0);
+        URL baseUrl;
+        if (urlBase == null) {
+            baseUrl = new URL(location);
+        } else {
+            baseUrl = new URL(urlBase.getTextContent());
+        }
 
         Element serviceList = (Element) device.getElementsByTagName("serviceList").item(0);
         NodeList services = serviceList.getElementsByTagName("service");
