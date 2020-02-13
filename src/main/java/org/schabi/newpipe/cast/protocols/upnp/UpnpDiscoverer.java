@@ -77,12 +77,12 @@ public class UpnpDiscoverer extends Discoverer {
         InetSocketAddress address = new InetSocketAddress(ip, 1900);
         socket.bind(address);
 
-        byte[] request = ("M-SEARCH * HTTP/1.1\n" +
-                          "HOST: 239.255.255.250:1900\n" +
-                          "MAN: \"ssdp:discover\"\n" +
-                          "MX: 5\n" +
-                          "ST: urn:schemas-upnp-org:device:MediaRenderer:1\n" +
-                          "CFPN.UPNP.ORG: PipeCast\n\n").getBytes();
+        byte[] request = ("M-SEARCH * HTTP/1.1\r\n" +
+                          "HOST: 239.255.255.250:1900\r\n" +
+                          "MAN: \"ssdp:discover\"\r\n" +
+                          "MX: 5\r\n" +
+                          "ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n" +
+                          "CFPN.UPNP.ORG: PipeCast\r\n\r\n").getBytes();
         DatagramPacket requestDatagram = new DatagramPacket(request, request.length, Inet4Address.getByName("239.255.255.250"), 1900);
         socket.send(requestDatagram);
 
