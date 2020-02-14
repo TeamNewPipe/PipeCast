@@ -82,7 +82,7 @@ public class UpnpDiscoverer extends Discoverer {
                           "MAN: \"ssdp:discover\"\r\n" +
                           "MX: 5\r\n" +
                           "ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n" +
-                          "CFPN.UPNP.ORG: PipeCast\r\n\r\n").getBytes();
+                          "CPFN.UPNP.ORG: PipeCast\r\n\r\n").getBytes();
         DatagramPacket requestDatagram = new DatagramPacket(request, request.length, Inet4Address.getByName("239.255.255.250"), 1900);
         socket.send(requestDatagram);
 
