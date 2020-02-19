@@ -1,7 +1,12 @@
 package org.schabi.newpipe.cast;
 
-import java.io.IOException;
+import org.xml.sax.SAXException;
 
+import java.io.IOException;
+import java.net.ProtocolException;
+import java.util.List;
+
+import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.stream.XMLStreamException;
 
 public abstract class Device {
@@ -13,5 +18,7 @@ public abstract class Device {
 
     public abstract String getName();
 
-    public abstract void play(String url, String title, String creator, String mimeType, ItemClass itemClass) throws IOException, XMLStreamException;
+    public abstract void play(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XMLStreamException;
+
+    public abstract List<MediaFormat> getSupportedFormats() throws IOException, XMLStreamException, ParserConfigurationException, SAXException;
 }

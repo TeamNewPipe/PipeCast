@@ -79,7 +79,6 @@ public class UpnpDiscoverer extends Discoverer {
                     }
                 }
                 if (add && !location.equals("")) {
-                    System.out.println("Response on address " + this.address);
                     devices.add(new UpnpDevice(location));
                 }
                 dataScanner.close();
