@@ -1,32 +1,33 @@
 package org.schabi.newpipe.cast.protocols.upnp;
 
+import org.schabi.newpipe.cast.Device;
+import org.schabi.newpipe.cast.Discoverer;
+import org.xml.sax.SAXException;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import org.schabi.newpipe.cast.Device;
-import org.schabi.newpipe.cast.Discoverer;
-import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
 
 public class UpnpDiscoverer extends Discoverer {
     private static final UpnpDiscoverer instance = new UpnpDiscoverer();
-
-    private DatagramSocket socket;
 
     public static UpnpDiscoverer getInstance() {
         return instance;
@@ -35,13 +36,18 @@ public class UpnpDiscoverer extends Discoverer {
     private List<Device> devices;
 
     private class ReceiveDevices implements Callable<Object> {
+        private DatagramSocket socket;
+
+        public ReceiveDevices(DatagramSocket skt) {
+            this.socket = skt;
+        }
+
         @Override
         public Object call() throws IOException, ParserConfigurationException, SAXException {
-            devices = new ArrayList<Device>();
             while (true) {
                 byte[] buffer = new byte[1024];
                 DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
-                socket.receive(packet);
+                this.socket.receive(packet);
                 byte[] data = packet.getData();
                 String dataString = new String(data, packet.getOffset(), packet.getLength());
                 Scanner dataScanner = new Scanner(dataString);
@@ -61,42 +67,57 @@ public class UpnpDiscoverer extends Discoverer {
                     devices.add(new UpnpDevice(location));
                 }
                 dataScanner.close();
+
             }
         }
     }
 
     @Override
-    public List<Device> discoverDevices() throws IOException, InterruptedException, ExecutionException {
-        String ip;
-        try (final DatagramSocket socket = new DatagramSocket()) {
-            socket.connect(InetAddress.getByName("192.0.2.0"), 9688);
-            ip = socket.getLocalAddress().getHostAddress();
+    public List<Device> discoverDevices() throws IOException, InterruptedException {
+        List<DatagramSocket> sockets = new ArrayList<>();
+        Set<String> addresses = new HashSet<>();
+        // get all site-local IPs to scan from
+        Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
+        while (ifaces.hasMoreElements()) {
+            NetworkInterface ni = ifaces.nextElement();
+            Enumeration<InetAddress> addrs = ni.getInetAddresses();
+            while (addrs.hasMoreElements()) {
+                InetAddress current = addrs.nextElement();
+                if (current.isSiteLocalAddress()) {
+                    addresses.add(current.getHostAddress());
+                }
+            }
         }
 
-        socket = new DatagramSocket(null);
-        InetSocketAddress address = new InetSocketAddress(ip, 1900);
-        socket.bind(address);
+        devices = new ArrayList<>();
 
-        byte[] request = ("M-SEARCH * HTTP/1.1\r\n" +
-                          "HOST: 239.255.255.250:1900\r\n" +
-                          "MAN: \"ssdp:discover\"\r\n" +
-                          "MX: 5\r\n" +
-                          "ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n" +
-                          "CPFN.UPNP.ORG: PipeCast\r\n\r\n").getBytes();
-        DatagramPacket requestDatagram = new DatagramPacket(request, request.length, Inet4Address.getByName("239.255.255.250"), 1900);
-        socket.send(requestDatagram);
+        ExecutorService executor = Executors.newFixedThreadPool(addresses.size());
+        Collection<ReceiveDevices> tasks = new ArrayList<>();
 
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<Object> future = executor.submit(new ReceiveDevices());
-        try {
-            future.get(5, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            future.cancel(true);
+        for (String addr : addresses) {
+            DatagramSocket socket = new DatagramSocket(null);
+            InetSocketAddress address = new InetSocketAddress(addr, 0);
+            socket.bind(address);
+
+            byte[] request = ("M-SEARCH * HTTP/1.1\r\n" +
+                    "HOST: 239.255.255.250:1900\r\n" +
+                    "MAN: \"ssdp:discover\"\r\n" +
+                    "MX: 5\r\n" +
+                    "ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n" +
+                    "CPFN.UPNP.ORG: PipeCast\r\n\r\n").getBytes();
+            DatagramPacket requestDatagram = new DatagramPacket(request, request.length, Inet4Address.getByName("239.255.255.250"), 1900);
+            socket.send(requestDatagram);
+            tasks.add(new ReceiveDevices(socket));
+            sockets.add(socket);
         }
-        executor.shutdownNow();
 
-        socket.close();
+        List<Future<Object>> futures = executor.invokeAll(tasks, 5, TimeUnit.SECONDS);
 
+        executor.shutdown();
+
+        for (DatagramSocket skt : sockets) {
+            skt.close();
+        }
         return devices;
     }
 }
