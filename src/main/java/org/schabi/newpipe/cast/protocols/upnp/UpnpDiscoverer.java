@@ -52,7 +52,7 @@ public class UpnpDiscoverer extends Discoverer {
                 String dataString = new String(data, packet.getOffset(), packet.getLength());
                 Scanner dataScanner = new Scanner(dataString);
                 String location = "";
-                Boolean add = false;
+                boolean add = false;
                 while (dataScanner.hasNextLine()) {
                     String line = dataScanner.nextLine();
                     if (line.startsWith("LOCATION: ")) {
@@ -67,7 +67,6 @@ public class UpnpDiscoverer extends Discoverer {
                     devices.add(new UpnpDevice(location));
                 }
                 dataScanner.close();
-
             }
         }
     }

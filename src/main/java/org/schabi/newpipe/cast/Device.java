@@ -24,5 +24,5 @@ public abstract class Device {
 
     public abstract List<MediaFormat> getSupportedFormats() throws IOException, XMLStreamException, ParserConfigurationException, SAXException;
 
-    public abstract void startBackgroundWork() throws IOException;
+    public abstract Stoppable startBackgroundWork() throws IOException;
 }

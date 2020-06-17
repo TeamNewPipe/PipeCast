@@ -2,6 +2,7 @@ package org.schabi.newpipe.cast.protocols.upnp;
 
 import org.schabi.newpipe.cast.Device;
 import org.schabi.newpipe.cast.MediaFormat;
+import org.schabi.newpipe.cast.Stoppable;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -328,7 +329,7 @@ public class UpnpDevice extends Device {
     }
 
     @Override
-    public void startBackgroundWork() throws IOException {
-        new GenaServer(this);
+    public Stoppable startBackgroundWork() throws IOException {
+        return new GenaServer(this);
     }
 }
