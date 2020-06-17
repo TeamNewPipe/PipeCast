@@ -1,10 +1,7 @@
 package org.schabi.newpipe.cast.exceptions;
 
 public class ProtocolNotFoundException extends Exception {
-    private static final long serialVersionUID = 3248824733038646732L;
-
-    public ProtocolNotFoundException() {
-    }
+    public ProtocolNotFoundException() { }
 
     public ProtocolNotFoundException(String message) {
         super(message);

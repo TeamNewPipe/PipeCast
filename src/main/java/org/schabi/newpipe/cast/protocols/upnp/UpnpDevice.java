@@ -2,7 +2,10 @@ package org.schabi.newpipe.cast.protocols.upnp;
 
 import org.schabi.newpipe.cast.Device;
 import org.schabi.newpipe.cast.MediaFormat;
+import org.schabi.newpipe.cast.PipeCast;
 import org.schabi.newpipe.cast.Stoppable;
+import org.schabi.newpipe.cast.XmlWriter;
+import org.schabi.newpipe.cast.exceptions.XmlWriterException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -14,7 +17,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.StringReader;
-import java.io.StringWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
@@ -23,9 +25,6 @@ import java.util.List;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.stream.XMLOutputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamWriter;
 
 public class UpnpDevice extends Device {
     private Document description;
@@ -91,7 +90,7 @@ public class UpnpDevice extends Device {
         return device.getElementsByTagName("friendlyName").item(0).getTextContent();
     }
 
-    private void play() throws IOException, XMLStreamException {
+    private void play() throws IOException, XmlWriterException {
         HttpURLConnection connection = (HttpURLConnection) avTransportUrl.openConnection();
         connection.setDoOutput(true);
         connection.setRequestMethod("POST");
@@ -99,9 +98,7 @@ public class UpnpDevice extends Device {
         connection.setRequestProperty("Soapaction", "\"urn:schemas-upnp-org:service:AVTransport:1#Play\"");
         OutputStream outputStream = connection.getOutputStream();
 
-        StringWriter sw = new StringWriter();
-        XMLOutputFactory xmlof = XMLOutputFactory.newInstance();
-        XMLStreamWriter writer = xmlof.createXMLStreamWriter(sw);
+        XmlWriter writer = PipeCast.getXmlWriter();
 
         writer.writeStartDocument("utf-8", "1.0");
         writer.writeStartElement("s:Envelope");
@@ -120,18 +117,15 @@ public class UpnpDevice extends Device {
         writer.writeEndElement();
         writer.writeEndElement();
         writer.writeEndDocument();
-        writer.close();
 
-        byte[] xml = sw.toString().getBytes();
+        byte[] xml = writer.end().getBytes();
         outputStream.write(xml);
         outputStream.close();
         connection.getInputStream();
     }
 
-    private String createDidl(String url, String title, String creator, MediaFormat mediaFormat) throws XMLStreamException {
-        StringWriter didlSw = new StringWriter();
-        XMLOutputFactory didlXmlof = XMLOutputFactory.newInstance();
-        XMLStreamWriter didlWriter = didlXmlof.createXMLStreamWriter(didlSw);
+    private String createDidl(String url, String title, String creator, MediaFormat mediaFormat) throws XmlWriterException {
+        XmlWriter didlWriter = PipeCast.getXmlWriter();
         didlWriter.writeStartElement("DIDL-Lite");
         didlWriter.writeNamespace("", "urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/");
         didlWriter.writeNamespace("dc", "http://purl.org/dc/elements/1.1/");
@@ -167,13 +161,12 @@ public class UpnpDevice extends Device {
         didlWriter.writeEndElement();
         didlWriter.writeEndElement();
         didlWriter.writeEndDocument();
-        didlWriter.close();
 
-        return didlSw.toString();
+        return didlWriter.end();
     }
 
     @Override
-    public void play(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XMLStreamException {
+    public void play(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XmlWriterException {
         HttpURLConnection connection = (HttpURLConnection) avTransportUrl.openConnection();
         connection.setDoOutput(true);
         connection.setRequestMethod("POST");
@@ -182,9 +175,7 @@ public class UpnpDevice extends Device {
         connection.setDoOutput(true);
         OutputStream outputStream = connection.getOutputStream();
 
-        StringWriter sw = new StringWriter();
-        XMLOutputFactory xmlof = XMLOutputFactory.newInstance();
-        XMLStreamWriter writer = xmlof.createXMLStreamWriter(sw);
+        XmlWriter writer = PipeCast.getXmlWriter();
         writer.writeStartDocument("utf-8", "1.0");
         writer.writeStartElement("s:Envelope");
         writer.writeAttribute("s:encodingStyle", "http://schemas.xmlsoap.org/soap/encoding/");
@@ -205,9 +196,8 @@ public class UpnpDevice extends Device {
         writer.writeEndElement();
         writer.writeEndElement();
         writer.writeEndDocument();
-        writer.close();
 
-        byte[] xml = sw.toString().getBytes();
+        byte[] xml = writer.end().getBytes();
         outputStream.write(xml);
         outputStream.close();
         connection.getInputStream();
@@ -231,10 +221,8 @@ public class UpnpDevice extends Device {
     }
 
     @Override
-    public void addToQueue(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XMLStreamException {
-        StringWriter sw = new StringWriter();
-        XMLOutputFactory xmlof = XMLOutputFactory.newInstance();
-        XMLStreamWriter writer = xmlof.createXMLStreamWriter(sw);
+    public void addToQueue(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XmlWriterException {
+        XmlWriter writer = PipeCast.getXmlWriter();
         writer.writeStartDocument("utf-8", "1.0");
         writer.writeStartElement("s:Envelope");
         writer.writeAttribute("s:encodingStyle", "http://schemas.xmlsoap.org/soap/encoding/");
@@ -255,9 +243,8 @@ public class UpnpDevice extends Device {
         writer.writeEndElement();
         writer.writeEndElement();
         writer.writeEndDocument();
-        writer.close();
 
-        queue.add(sw.toString());
+        queue.add(writer.end());
 
         if (queue.size() == 1) {
             setNextAvTransportUri();
@@ -265,7 +252,7 @@ public class UpnpDevice extends Device {
     }
 
     @Override
-    public List<MediaFormat> getSupportedFormats() throws IOException, XMLStreamException, ParserConfigurationException, SAXException {
+    public List<MediaFormat> getSupportedFormats() throws IOException, XmlWriterException, ParserConfigurationException, SAXException {
         HttpURLConnection connection = (HttpURLConnection) connectionManagerUrl.openConnection();
         connection.setDoOutput(true);
         connection.setRequestMethod("POST");
@@ -274,9 +261,7 @@ public class UpnpDevice extends Device {
         connection.setDoOutput(true);
         OutputStream outputStream = connection.getOutputStream();
 
-        StringWriter sw = new StringWriter();
-        XMLOutputFactory xmlof = XMLOutputFactory.newInstance();
-        XMLStreamWriter writer = xmlof.createXMLStreamWriter(sw);
+        XmlWriter writer = PipeCast.getXmlWriter();
         writer.writeStartDocument("utf-8", "1.0");
         writer.writeStartElement("s:Envelope");
         writer.writeAttribute("s:encodingStyle", "http://schemas.xmlsoap.org/soap/encoding/");
@@ -288,9 +273,8 @@ public class UpnpDevice extends Device {
         writer.writeEndElement();
         writer.writeEndElement();
         writer.writeEndDocument();
-        writer.close();
 
-        byte[] xml = sw.toString().getBytes();
+        byte[] xml = writer.end().getBytes();
         outputStream.write(xml);
         outputStream.close();
 

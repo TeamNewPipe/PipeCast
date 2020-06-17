@@ -1,9 +1,23 @@
 package org.schabi.newpipe.cast;
 
 import org.schabi.newpipe.cast.exceptions.ProtocolNotFoundException;
+import org.schabi.newpipe.cast.exceptions.XmlWriterException;
 
-public class PipeCast {
-    private PipeCast() {
+public final class PipeCast {
+    private static Class<? extends XmlWriter> xmlWriter;
+
+    private PipeCast() { }
+
+    public static void init(Class<? extends XmlWriter> xmlWriter) {
+        PipeCast.xmlWriter = xmlWriter;
+    }
+
+    public static XmlWriter getXmlWriter() throws XmlWriterException {
+        try {
+            return xmlWriter.newInstance();
+        } catch (IllegalAccessException | InstantiationException e) {
+            throw new XmlWriterException(e);
+        }
     }
 
     public static CastingProtocol[] getProtocols() {
