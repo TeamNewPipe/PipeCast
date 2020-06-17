@@ -20,5 +20,9 @@ public abstract class Device {
 
     public abstract void play(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XMLStreamException;
 
+    public abstract void addToQueue(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XMLStreamException;
+
     public abstract List<MediaFormat> getSupportedFormats() throws IOException, XMLStreamException, ParserConfigurationException, SAXException;
+
+    public abstract void startBackgroundWork() throws IOException;
 }

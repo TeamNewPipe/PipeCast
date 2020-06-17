@@ -2,7 +2,9 @@ apply plugin: 'java-library'
 
 repositories {
     jcenter()
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
+    implementation 'com.github.wb9688:nanohttpd:f23888e8b63baa6a3010d1e75ebdf3a48d14147d'
 }

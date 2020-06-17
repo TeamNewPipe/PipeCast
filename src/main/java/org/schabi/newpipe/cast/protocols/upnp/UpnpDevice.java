@@ -1,5 +1,13 @@
 package org.schabi.newpipe.cast.protocols.upnp;
 
+import org.schabi.newpipe.cast.Device;
+import org.schabi.newpipe.cast.MediaFormat;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -7,7 +15,6 @@ import java.io.OutputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.net.HttpURLConnection;
-import java.net.ProtocolException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,19 +26,15 @@ import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
-import org.schabi.newpipe.cast.Device;
-import org.schabi.newpipe.cast.MediaFormat;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
-
 public class UpnpDevice extends Device {
     private Document description;
     private Element device;
+
     private URL avTransportUrl;
+    URL avTransportEventUrl;
     private URL connectionManagerUrl;
+
+    List<String> queue = new ArrayList<>();
 
     public UpnpDevice(String location) throws IOException, ParserConfigurationException, SAXException {
         super(location);
@@ -73,6 +76,8 @@ public class UpnpDevice extends Device {
             if (service.getElementsByTagName("serviceType").item(0).getTextContent().equals("urn:schemas-upnp-org:service:AVTransport:1")) {
                 String serviceUrl = service.getElementsByTagName("controlURL").item(0).getTextContent();
                 avTransportUrl = new URL(baseUrl, serviceUrl);
+                String serviceEventUrl = service.getElementsByTagName("eventSubURL").item(0).getTextContent();
+                avTransportEventUrl = new URL(baseUrl, serviceEventUrl);
             } else if (service.getElementsByTagName("serviceType").item(0).getTextContent().equals("urn:schemas-upnp-org:service:ConnectionManager:1")) {
                 String serviceUrl = service.getElementsByTagName("controlURL").item(0).getTextContent();
                 connectionManagerUrl = new URL(baseUrl, serviceUrl);
@@ -122,16 +127,7 @@ public class UpnpDevice extends Device {
         connection.getInputStream();
     }
 
-    @Override
-    public void play(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XMLStreamException {
-        HttpURLConnection connection = (HttpURLConnection) avTransportUrl.openConnection();
-        connection.setDoOutput(true);
-        connection.setRequestMethod("POST");
-        connection.setRequestProperty("Content-Type", "text/xml;charset=utf-8");
-        connection.setRequestProperty("Soapaction", "\"urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI\"");
-        connection.setDoOutput(true);
-        OutputStream outputStream = connection.getOutputStream();
-
+    private String createDidl(String url, String title, String creator, MediaFormat mediaFormat) throws XMLStreamException {
         StringWriter didlSw = new StringWriter();
         XMLOutputFactory didlXmlof = XMLOutputFactory.newInstance();
         XMLStreamWriter didlWriter = didlXmlof.createXMLStreamWriter(didlSw);
@@ -172,6 +168,19 @@ public class UpnpDevice extends Device {
         didlWriter.writeEndDocument();
         didlWriter.close();
 
+        return didlSw.toString();
+    }
+
+    @Override
+    public void play(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XMLStreamException {
+        HttpURLConnection connection = (HttpURLConnection) avTransportUrl.openConnection();
+        connection.setDoOutput(true);
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "text/xml;charset=utf-8");
+        connection.setRequestProperty("Soapaction", "\"urn:schemas-upnp-org:service:AVTransport:1#SetAVTransportURI\"");
+        connection.setDoOutput(true);
+        OutputStream outputStream = connection.getOutputStream();
+
         StringWriter sw = new StringWriter();
         XMLOutputFactory xmlof = XMLOutputFactory.newInstance();
         XMLStreamWriter writer = xmlof.createXMLStreamWriter(sw);
@@ -189,7 +198,7 @@ public class UpnpDevice extends Device {
         writer.writeCharacters(url);
         writer.writeEndElement();
         writer.writeStartElement("CurrentURIMetaData");
-        writer.writeCharacters(didlSw.toString());
+        writer.writeCharacters(createDidl(url, title, creator, mediaFormat));
         writer.writeEndElement();
         writer.writeEndElement();
         writer.writeEndElement();
@@ -203,6 +212,55 @@ public class UpnpDevice extends Device {
         connection.getInputStream();
 
         play();
+    }
+
+    void setNextAvTransportUri() throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) avTransportUrl.openConnection();
+        connection.setDoOutput(true);
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "text/xml;charset=utf-8");
+        connection.setRequestProperty("Soapaction", "\"urn:schemas-upnp-org:service:AVTransport:1#SetNextAVTransportURI\"");
+        connection.setDoOutput(true);
+        OutputStream outputStream = connection.getOutputStream();
+
+        byte[] xml = queue.get(0).getBytes();
+        outputStream.write(xml);
+        outputStream.close();
+        connection.getInputStream();
+    }
+
+    @Override
+    public void addToQueue(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XMLStreamException {
+        StringWriter sw = new StringWriter();
+        XMLOutputFactory xmlof = XMLOutputFactory.newInstance();
+        XMLStreamWriter writer = xmlof.createXMLStreamWriter(sw);
+        writer.writeStartDocument("utf-8", "1.0");
+        writer.writeStartElement("s:Envelope");
+        writer.writeAttribute("s:encodingStyle", "http://schemas.xmlsoap.org/soap/encoding/");
+        writer.writeNamespace("s", "http://schemas.xmlsoap.org/soap/envelope/");
+        writer.writeStartElement("s:Body");
+        writer.writeStartElement("u:SetNextAVTransportURI");
+        writer.writeNamespace("u", "urn:schemas-upnp-org:service:AVTransport:1");
+        writer.writeStartElement("InstanceID");
+        writer.writeCharacters("0");
+        writer.writeEndElement();
+        writer.writeStartElement("NextURI");
+        writer.writeCharacters(url);
+        writer.writeEndElement();
+        writer.writeStartElement("NextURIMetaData");
+        writer.writeCharacters(createDidl(url, title, creator, mediaFormat));
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndDocument();
+        writer.close();
+
+        queue.add(sw.toString());
+
+        if (queue.size() == 1) {
+            setNextAvTransportUri();
+        }
     }
 
     @Override
@@ -243,8 +301,6 @@ public class UpnpDevice extends Device {
         }
         input.close();
 
-        System.out.println(response.toString());
-
         InputSource inputSource = new InputSource(new StringReader(response.toString()));
         DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
         DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
@@ -269,5 +325,10 @@ public class UpnpDevice extends Device {
         }
 
         return supportedFormats;
+    }
+
+    @Override
+    public void startBackgroundWork() throws IOException {
+        new GenaServer(this);
     }
 }
