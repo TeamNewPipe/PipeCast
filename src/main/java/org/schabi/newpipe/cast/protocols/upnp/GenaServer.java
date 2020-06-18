@@ -18,7 +18,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.StringReader;
 import java.net.Socket;
-import java.util.Map;
 import java.util.Scanner;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -38,7 +37,7 @@ public class GenaServer implements Stoppable {
 
         String request = "SUBSCRIBE " + upnpDevice.avTransportEventUrl.getPath() + " HTTP/1.1\r\n"
                 + "HOST: " + upnpDevice.avTransportEventUrl.getHost() + ":" + upnpDevice.avTransportEventUrl.getPort() + "\r\n"
-                + "CALLBACK: <http://192.168.1.16:30303>\r\n"
+                + "CALLBACK: <http://" + upnpDevice.inetAddress.getHostAddress() +":30303>\r\n"
                 + "NT: upnp:event\r\n"
                 + "TIMEOUT: Second-infinite\r\n\r\n"; // TODO: implement timeout properly as infinite is deprecated
 

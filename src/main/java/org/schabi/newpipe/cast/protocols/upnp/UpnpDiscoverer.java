@@ -64,7 +64,7 @@ public class UpnpDiscoverer extends Discoverer {
                     }
                 }
                 if (add && !location.equals("")) {
-                    devices.add(new UpnpDevice(location));
+                    devices.add(new UpnpDevice(location, socket.getLocalAddress()));
                 }
                 dataScanner.close();
             }

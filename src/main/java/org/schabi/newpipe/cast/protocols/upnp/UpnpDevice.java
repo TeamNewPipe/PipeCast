@@ -18,6 +18,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.StringReader;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,8 +37,8 @@ public class UpnpDevice extends Device {
 
     List<String> queue = new ArrayList<>();
 
-    public UpnpDevice(String location) throws IOException, ParserConfigurationException, SAXException {
-        super(location);
+    public UpnpDevice(String location, InetAddress inetAddress) throws IOException, ParserConfigurationException, SAXException {
+        super(location, inetAddress);
         getDescription();
     }
 

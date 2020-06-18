@@ -4,15 +4,18 @@ import org.schabi.newpipe.cast.exceptions.XmlWriterException;
 import org.xml.sax.SAXException;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.List;
 
 import javax.xml.parsers.ParserConfigurationException;
 
 public abstract class Device {
     public final String location;
+    public final InetAddress inetAddress;
 
-    public Device(String location) {
+    public Device(String location, InetAddress inetAddress) {
         this.location = location;
+        this.inetAddress = inetAddress;
     }
 
     public abstract String getName();
