@@ -8,6 +8,7 @@ import org.schabi.newpipe.cast.XmlWriter;
 import org.schabi.newpipe.cast.exceptions.XmlWriterException;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -249,6 +250,95 @@ public class UpnpDevice extends Device {
 
         if (queue.size() == 1) {
             setNextAvTransportUri();
+        }
+    }
+
+    private void pause() throws IOException, XmlWriterException {
+        HttpURLConnection connection = (HttpURLConnection) avTransportUrl.openConnection();
+        connection.setDoOutput(true);
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "text/xml;charset=utf-8");
+        connection.setRequestProperty("Soapaction", "\"urn:schemas-upnp-org:service:AVTransport:1#Pause\"");
+        OutputStream outputStream = connection.getOutputStream();
+
+        XmlWriter writer = PipeCast.getXmlWriter();
+
+        writer.writeStartDocument("utf-8", "1.0");
+        writer.writeStartElement("s:Envelope");
+        writer.writeAttribute("s:encodingStyle", "http://schemas.xmlsoap.org/soap/encoding/");
+        writer.writeNamespace("s", "http://schemas.xmlsoap.org/soap/envelope/");
+        writer.writeStartElement("s:Body");
+        writer.writeStartElement("u:Pause");
+        writer.writeNamespace("u", "urn:schemas-upnp-org:service:AVTransport:1");
+        writer.writeStartElement("InstanceID");
+        writer.writeCharacters("0");
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndDocument();
+
+        byte[] xml = writer.end().getBytes();
+        outputStream.write(xml);
+        outputStream.close();
+        connection.getInputStream();
+    }
+
+    private Element getTransportInfo() throws IOException, XmlWriterException, ParserConfigurationException, SAXException {
+        HttpURLConnection connection = (HttpURLConnection) avTransportUrl.openConnection();
+        connection.setDoOutput(true);
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "text/xml;charset=utf-8");
+        connection.setRequestProperty("Soapaction", "\"urn:schemas-upnp-org:service:AVTransport:1#GetTransportInfo\"");
+        OutputStream outputStream = connection.getOutputStream();
+
+        XmlWriter writer = PipeCast.getXmlWriter();
+
+        writer.writeStartDocument("utf-8", "1.0");
+        writer.writeStartElement("s:Envelope");
+        writer.writeAttribute("s:encodingStyle", "http://schemas.xmlsoap.org/soap/encoding/");
+        writer.writeNamespace("s", "http://schemas.xmlsoap.org/soap/envelope/");
+        writer.writeStartElement("s:Body");
+        writer.writeStartElement("u:GetTransportInfo");
+        writer.writeNamespace("u", "urn:schemas-upnp-org:service:AVTransport:1");
+        writer.writeStartElement("InstanceID");
+        writer.writeCharacters("0");
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndElement();
+        writer.writeEndDocument();
+
+        byte[] xml = writer.end().getBytes();
+        outputStream.write(xml);
+        outputStream.close();
+
+        BufferedReader input = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+        String line;
+        StringBuilder response = new StringBuilder();
+        while ((line = input.readLine()) != null) {
+            response.append(line);
+        }
+        input.close();
+
+        InputSource inputSource = new InputSource(new StringReader(response.toString()));
+        DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
+        Document document = documentBuilder.parse(inputSource);
+        document.getDocumentElement().normalize();
+
+        Element body = (Element) document.getDocumentElement().getElementsByTagName("s:Body").item(0);
+        return (Element) body.getElementsByTagName("u:GetTransportInfoResponse").item(0);
+    }
+
+    @Override
+    public void playPause() throws IOException, XmlWriterException, ParserConfigurationException, SAXException {
+        Node currentTransportState = getTransportInfo().getElementsByTagName("CurrentTransportState").item(0);
+
+        if (currentTransportState.getTextContent().equals("PLAYING")) {
+            pause();
+        } else {
+            play();
         }
     }
 

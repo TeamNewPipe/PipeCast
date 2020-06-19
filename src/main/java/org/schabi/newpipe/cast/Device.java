@@ -24,6 +24,8 @@ public abstract class Device {
 
     public abstract void addToQueue(String url, String title, String creator, MediaFormat mediaFormat) throws IOException, XmlWriterException;
 
+    public abstract void playPause() throws IOException, XmlWriterException, ParserConfigurationException, SAXException;
+
     public abstract List<MediaFormat> getSupportedFormats() throws IOException, ParserConfigurationException, SAXException, XmlWriterException;
 
     public abstract Stoppable startBackgroundWork() throws IOException;
