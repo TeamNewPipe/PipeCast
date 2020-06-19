@@ -12,7 +12,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
@@ -21,7 +20,6 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -91,7 +89,7 @@ public class UpnpDiscoverer extends Discoverer {
         devices = new ArrayList<>();
 
         ExecutorService executor = Executors.newFixedThreadPool(addresses.size());
-        Collection<ReceiveDevices> tasks = new ArrayList<>();
+        List<ReceiveDevices> tasks = new ArrayList<>();
 
         for (String addr : addresses) {
             DatagramSocket socket = new DatagramSocket(null);
@@ -101,7 +99,7 @@ public class UpnpDiscoverer extends Discoverer {
             byte[] request = ("M-SEARCH * HTTP/1.1\r\n" +
                     "HOST: 239.255.255.250:1900\r\n" +
                     "MAN: \"ssdp:discover\"\r\n" +
-                    "MX: 5\r\n" +
+                    "MX: 3\r\n" +
                     "ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n" +
                     "CPFN.UPNP.ORG: PipeCast\r\n\r\n").getBytes();
             DatagramPacket requestDatagram = new DatagramPacket(request, request.length, Inet4Address.getByName("239.255.255.250"), 1900);
@@ -110,7 +108,7 @@ public class UpnpDiscoverer extends Discoverer {
             sockets.add(socket);
         }
 
-        List<Future<Object>> futures = executor.invokeAll(tasks, 5, TimeUnit.SECONDS);
+        executor.invokeAll(tasks, 5, TimeUnit.SECONDS);
 
         executor.shutdown();
 
